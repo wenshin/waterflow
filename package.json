@@ -37,7 +37,7 @@
     "isparta": "^4.0.0"
   },
   "scripts": {
-    "prepublish": "gulp prepublish",
+    "prepublish": "./node_modules/.bin/gulp prepublish",
     "test": "gulp covertest",
     "debug-test": "node debug $(which gulp) test"
   },
