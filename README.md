@@ -25,7 +25,9 @@ AsyncPipe is a function accept a `value` parameter and should return a promise o
 
 If there is a AsyncPipe in pipeline, the `Pipeline.flow()` will return a promise object. otherwise all pipe is SyncPipe it will return the value;
 
-```
+```javascript
+import Pipeline from 'waterflow';
+
 let pipeline = new Pipeline(
     'Pipeline of SyncPipe',
     [
@@ -62,7 +64,9 @@ pipeline
 
 ### Flow data with SyncPipe `flowMap` and `flowReduce`
 
-```
+```javascript
+import Pipeline from 'waterflow';
+
 let pipeline = new Pipeline(
     'Pipeline Logger test',
     [
@@ -80,6 +84,8 @@ assert.equal(pipeline.flow({data1: 10, data2: 20, data3: 30}), 10 + 1 + 20 + 1);
 
 ### Middlewares
 
+Javascript has a weird problem.
+
 Pipeline can use middlewares between pipes, before first pipe start and after last pipe finished.
 
 ```
@@ -94,3 +100,35 @@ Pipeline can use middlewares between pipes, before first pipe start and after la
 (4): PipeMiddleware2.pre
 (5): PipeMiddleware2.post
 (6): PipelineMiddleware1.post
+
+### Use and Customize Middlewares
+
+```javascript
+import Pipeline from 'waterflow';
+import LoggerMiddleware from 'waterflow/middlewares/logger';
+import {makeRoundNumberHandler, toNumberHandler} from 'waterflow/middlewares/number';
+
+// When pipeline finished and the value is number, change the number to
+let RoundNumberPipeMiddleware = {
+  type: 'pipe',
+  name: 'RoundNumberPipeMiddleware',
+  post: makeRoundNumberHandler()
+};
+
+let ToNumberPipeMiddleware = {
+  type: 'pipe',
+  name: 'ToNumberPipeMiddleware',
+  pre: toNumberHandler
+};
+
+
+Pipeline.applyPipelineMiddlewares(LoggerMiddleware);
+Pipeline.applyCommonPipeMiddlewares(ToNumberPipeMiddleware);
+
+let pipeline = new Pipeline(
+    'Pipeline inline test',
+    [
+        {name: '', handle: v => 1 / v, middlewares=[RoundNumberPipeMiddleware]},
+    ]
+);
+```
