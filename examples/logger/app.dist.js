@@ -397,8 +397,8 @@ function pipelineWrap(_input) {
      *     handle, initialValue 分别对应 Array.reduce(callback[, initialValue]) 的参数
      * @return {Object}         wrapper
      */
-    reduceFlow: function reduceFlow(pipe) {
-      pipe = _preparePipe(pipe, 'reduceFlow');
+    flowReduce: function flowReduce(pipe) {
+      pipe = _preparePipe(pipe, 'flowReduce');
       pipe.type = 'reduce';
       _addSyncPipe(pipe);
       return wrapper;
@@ -690,7 +690,7 @@ var pl = new Pipeline('myPipeline', [
   {name: 'map', handle: v => 1/v, filter: v => v < 30, type: 'mapFlow'},
   {
     name: 'reduce',
-    type: 'reduceFlow',
+    type: 'flowReduce',
     handle: (pre, cur) => pre + cur,
     initialValue: 0,
     middlewares: [RoundNumberPipeMiddleware]

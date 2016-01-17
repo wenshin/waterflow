@@ -25,7 +25,7 @@ var pl = new Pipeline('myPipeline', [
   {name: 'map', handle: v => 1/v, filter: v => v < 30, type: 'mapFlow'},
   {
     name: 'reduce',
-    type: 'reduceFlow',
+    type: 'flowReduce',
     handle: (pre, cur) => pre + cur,
     initialValue: 0,
     middlewares: [RoundNumberPipeMiddleware]

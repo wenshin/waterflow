@@ -76,7 +76,7 @@ describe('pipelineWrap', function () {
     let except = pipelineWrap({1: 10, 2: 20, 3: 30})
     // let except = pipelineWrap({1: 10, 2: 20, 3: 30}, {middlewares: [PipelineLoggerMiddleware]})
       .mapFlow({handle: v => 1/v, filter: v => v < 30})
-      .reduceFlow({
+      .flowReduce({
         handle: (pre, cur) => pre + cur,
         initialValue: 0,
         middlewares: [RoundNumberPipeMiddleware]
@@ -87,12 +87,12 @@ describe('pipelineWrap', function () {
 
   // it('应该正确处理异步管道出错', function (done) {});
 
-  it('可以正确执行同步方法 mapFlow 和 reduceFlow', function () {
+  it('可以正确执行同步方法 mapFlow 和 flowReduce', function () {
     let except = pipelineWrap(10)
     // let except = pipelineWrap(10, {middlewares: [PipelineLoggerMiddleware]})
       .flow(v => [1*v, 2*v, 3*v])
       .mapFlow({handle: v => 1/v, filter: v => v < 30})
-      .reduceFlow({
+      .flowReduce({
         handle: (pre, cur) => pre + cur,
         initialValue: 0,
         middlewares: [RoundNumberPipeMiddleware]

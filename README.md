@@ -1,5 +1,7 @@
-# waterflow
+# Waterflow
+
 A pipeline deal with data like water. support Map, Reduce, Async Pipes.
+
 
 # install
 
@@ -9,8 +11,86 @@ npm install waterflow --save
 
 # Usage
 
+#### Explain SyncPipe and AsyncPipe
+
+SyncPipe is a type of pipe will execute immediately. SyncPipe include `flow`, `flowMap`, `flowReduce`.
+
+AsyncPipe is a type of pipe will execute async.
+
+### SyncPipe `flow` and AsyncPipe `flowAsync`
+
+SyncPipe is a function accept a `value` parameter and should return a new `value`;
+
+AsyncPipe is a function accept a `value` parameter and should return a promise object;
+
+If there is a AsyncPipe in pipeline, the `Pipeline.flow()` will return a promise object. otherwise all pipe is SyncPipe it will return the value;
+
 ```
-var pipeline = new Pipeline('myPipeline', [
-  {}
-]);
+let pipeline = new Pipeline(
+    'Pipeline of SyncPipe',
+    [
+        {name: 'plus1', handle: v => v++, type: 'flow'}, // flow isDefault
+        {name: 'Negative', handle: v => -v}
+    ]
+);
+
+assert.equal(pipeline.flow(10), -11);
+
+let pipeline = new Pipeline(
+    'Pipeline of SyncPipe and AsyncPipe',
+    [
+        {name: 'plus1', handle: v => v++, type: 'flow'}, // flow isDefault
+        {
+            name: '2 times',
+            handle: v => {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        resolve(v * 2);
+                    }, 200)
+                });
+            }, type: 'flowAsync'
+        },
+        {name: 'Negative', handle: v => -v}
+    ]
+);
+
+pipeline
+    .flow(10)
+    .then(v => asset.equal(v === -22))
+    .catch(err => console.log(err));
 ```
+
+### Flow data with SyncPipe `flowMap` and `flowReduce`
+
+```
+let pipeline = new Pipeline(
+    'Pipeline Logger test',
+    [
+        // If `filter(item)` return `false` will been dropped.
+        // This example will drop the value which great or equal 30
+        {name: 'map plus 1', handle: v => v++, filter: v => v < 30, type: 'flowMap'},
+        {name: 'sum', handle: (pre, cur) => return pre + cur, initialValue: 0, type: 'flowReduce'}
+    ]
+);
+
+assert.equal(pipeline.flow([10, 20, 30]), 10 + 1 + 20 + 1);
+assert.equal(pipeline.flow({data1: 10, data2: 20, data3: 30}), 10 + 1 + 20 + 1);
+
+```
+
+### Middlewares
+
+Pipeline can use middlewares between pipes, before first pipe start and after last pipe finished.
+
+```
+- - - - - - - - - +------+ - - - - - - - - - +------+ - - - - - - - -
+  | (1) | (2) (3) | pipe | (4) (5) | (2) (3) | pipe | (4) (5) | (6) |
+- - - - - - - - - +------+ - - - - - - - - - +------+ - - - - - - - -
+```
+
+(1): PipelineMiddleware1.pre
+(2): PipeMiddleware1.pre
+(3): PipeMiddleware1.post
+(4): PipeMiddleware2.pre
+(5): PipeMiddleware2.post
+(6): PipelineMiddleware1.post
