@@ -72,10 +72,10 @@ describe('pipelineWrap', function () {
     }, 30);
   });
 
-  it('可以正确用 mapFlow 处理对象', function () {
+  it('可以正确用 flowMap 处理对象', function () {
     let except = pipelineWrap({1: 10, 2: 20, 3: 30})
     // let except = pipelineWrap({1: 10, 2: 20, 3: 30}, {middlewares: [PipelineLoggerMiddleware]})
-      .mapFlow({handle: v => 1/v, filter: v => v < 30})
+      .flowMap({handle: v => 1/v, filter: v => v < 30})
       .flowReduce({
         handle: (pre, cur) => pre + cur,
         initialValue: 0,
@@ -87,11 +87,11 @@ describe('pipelineWrap', function () {
 
   // it('应该正确处理异步管道出错', function (done) {});
 
-  it('可以正确执行同步方法 mapFlow 和 flowReduce', function () {
+  it('可以正确执行同步方法 flowMap 和 flowReduce', function () {
     let except = pipelineWrap(10)
     // let except = pipelineWrap(10, {middlewares: [PipelineLoggerMiddleware]})
       .flow(v => [1*v, 2*v, 3*v])
-      .mapFlow({handle: v => 1/v, filter: v => v < 30})
+      .flowMap({handle: v => 1/v, filter: v => v < 30})
       .flowReduce({
         handle: (pre, cur) => pre + cur,
         initialValue: 0,
@@ -99,6 +99,20 @@ describe('pipelineWrap', function () {
       })
       .finish();
     assert.equal(except, 0.15);
+  });
+
+  it('可以使用 handles 传递多个处理函数执行 flowMap ', function () {
+    let except = pipelineWrap(10)
+    // let except = pipelineWrap(10, {middlewares: [PipelineLoggerMiddleware]})
+      .flow(v => [1*v, 2*v, 3*v])
+      .flowMap({handles: [v => 1 / v, v => 1 / v + 1, v => 1 / v + 2], filter: v => v < 30})
+      .flowReduce({
+        handle: (pre, cur) => pre + cur,
+        initialValue: 0,
+        middlewares: [RoundNumberPipeMiddleware]
+      })
+      .finish();
+    assert.equal(except, 1.15);
   });
 
 });
