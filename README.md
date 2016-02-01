@@ -31,7 +31,7 @@ import Pipeline from 'waterflow';
 let pipeline = new Pipeline(
     'Pipeline of SyncPipe',
     [
-        {name: 'plus1', handle: v => v++, type: 'flow'}, // flow isDefault
+        {name: 'plus1', handle: v => v++}, // SyncPipe `flow` isDefault
         {name: 'Negative', handle: v => -v}
     ]
 );
@@ -41,7 +41,7 @@ assert.equal(pipeline.flow(10), -11);
 let pipeline = new Pipeline(
     'Pipeline of SyncPipe and AsyncPipe',
     [
-        {name: 'plus1', handle: v => v++, type: 'flow'}, // flow isDefault
+        {name: 'plus1', handle: v => v++}, // SyncPipe `flow` isDefault
         {
             name: '2 times',
             handle: v => {
@@ -50,7 +50,7 @@ let pipeline = new Pipeline(
                         resolve(v * 2);
                     }, 200)
                 });
-            }, type: 'flowAsync'
+            }, type: 'async'
         },
         {name: 'Negative', handle: v => -v}
     ]
@@ -72,14 +72,51 @@ let pipeline = new Pipeline(
     [
         // If `filter(item)` return `false` will been dropped.
         // This example will drop the value which great or equal 30
-        {name: 'map plus 1', handle: v => v++, filter: v => v < 30, type: 'flowMap'},
-        {name: 'sum', handle: (pre, cur) => return pre + cur, initialValue: 0, type: 'flowReduce'}
+        {name: 'map plus 1', handle: v => v++, filter: v => v < 30, type: 'map'},
+        {name: 'sum', handle: (pre, cur) => return pre + cur, initialValue: 0, type: 'reduce'}
     ]
 );
 
 assert.equal(pipeline.flow([10, 20, 30]), 10 + 1 + 20 + 1);
 assert.equal(pipeline.flow({data1: 10, data2: 20, data3: 30}), 10 + 1 + 20 + 1);
 
+```
+
+### Flow data with AsyncPipe `flowMapAsync`
+
+```javascript
+import Pipeline from 'waterflow';
+
+let pipeline = new Pipeline(
+    'Pipeline Logger test',
+    [
+        // If `filter(item)` return `false` will been dropped.
+        // This example will drop the value which great or equal 30
+        {
+            name: 'map plus 1',
+            handle: v => v => {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        resolve(v++);
+                    }, 200)
+                });
+            },
+            filter: v => v < 30,
+            type: 'mapAsync'}
+    ]
+);
+
+pipeline
+    .flow([10, 20, 30])
+    .then(data => {
+        assert.sameMembers(data, [11, 21])
+    });
+
+pipeline
+    .flow({data1: 10, data2: 20, data3: 30})
+    .then(data => {
+        assert.deepEqual(data, {data1: 11, data2: 21})
+    });
 ```
 
 ### Middlewares
