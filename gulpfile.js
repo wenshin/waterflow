@@ -49,7 +49,8 @@ gulp.task('test', ['pre-test'], function (cb) {
     .pipe(istanbul.writeReports())
     .on('end', function () {
       // 'test failed'.indexOf('1 test failed') === -1 !!!
-      if ( !/tests?\s+failed/gi.test(mochaErr.message) ) {
+      let message = mochaErr ? mochaErr.message : '';
+      if ( !/tests?\s+failed/gi.test(message) ) {
         cb(mochaErr);
       } else {
         cb('');

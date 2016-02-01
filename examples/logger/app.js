@@ -1,6 +1,6 @@
-var Pipeline = require('../../dist/pipeline').default;
-var PipelineLogger = require('../../dist/pipeline/middlewares/logger').default;
-var makeRoundNumberHandler = require('../../dist/pipeline/middlewares/number').makeRoundNumberHandler;
+var Pipeline = require('../../dist').default;
+var PipelineLogger = require('../../dist/middlewares/logger').default;
+var makeRoundNumberHandler = require('../../dist/middlewares/number').makeRoundNumberHandler;
 
 Pipeline.pipelineMiddlewares.push(PipelineLogger);
 
@@ -14,18 +14,18 @@ var pl = new Pipeline('myPipeline', [
   {name: 'pipe1', handle: v => 1 / v},
   {
     name: '2times',
-    type: 'flowAsync',
+    type: 'async',
     handle: v => {
       return new Promise((resolve, reject) => {
         setTimeout(() => resolve(v * 2));
       });
     }
   },
-  {handle: v => [1, 2, 3]},
-  {name: 'map', handle: v => 1/v, filter: v => v < 30, type: 'mapFlow'},
+  {handle: () => [1, 2, 3]},
+  {name: 'map', handle: v => 1/v, filter: v => v < 30, type: 'map'},
   {
     name: 'reduce',
-    type: 'flowReduce',
+    type: 'reduce',
     handle: (pre, cur) => pre + cur,
     initialValue: 0,
     middlewares: [RoundNumberPipeMiddleware]
