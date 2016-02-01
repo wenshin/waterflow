@@ -115,7 +115,7 @@ describe('pipeline', function () {
     assert.equal(except, 1.15);
   });
 
-  it('可以正确执行 flowMapAsync', function (done) {
+  it('可以正确执行只有一个 handler 的 flowMapAsync', function (done) {
     let asyncPipe = data => {
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -141,6 +141,44 @@ describe('pipeline', function () {
       });
     setTimeout(() => {
       assert.equal(except, 60);
+      done();
+    }, 30);
+  });
+
+  it('可以正确执行有多个 handler 的 flowMapAsync', function (done) {
+    let async2Times = data => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(data * 2);
+        }, 10);
+      });
+    };
+
+    let asyncHalf = data => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(data * 0.5);
+        }, 10);
+      });
+    };
+
+    let promise = pipeline([10, 20, 30])
+    // let promise = pipeline([10, 20, 30], {middlewares: [PipelineLoggerMiddleware]})
+      .flowMapAsync({handles: [async2Times, null, asyncHalf]})
+      .flowReduce({
+        handle: (pre, cur) => pre + cur,
+        initialValue: 0,
+        middlewares: [RoundNumberPipeMiddleware]
+      })
+      .finish();
+
+    let except;
+    promise
+      .then(data => {
+        except = data;
+      });
+    setTimeout(() => {
+      assert.equal(except, 35);
       done();
     }, 30);
   });
