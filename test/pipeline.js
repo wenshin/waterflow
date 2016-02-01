@@ -115,4 +115,34 @@ describe('pipeline', function () {
     assert.equal(except, 1.15);
   });
 
+  it('可以正确执行 flowMapAsync', function (done) {
+    let asyncPipe = data => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(data * 2);
+        }, 10);
+      });
+    };
+
+    let promise = pipeline([10, 20, 30])
+    // let promise = pipeline([10, 20, 30], {middlewares: [PipelineLoggerMiddleware]})
+      .flowMapAsync({handle: asyncPipe, filter: v => v < 30})
+      .flowReduce({
+        handle: (pre, cur) => pre + cur,
+        initialValue: 0,
+        middlewares: [RoundNumberPipeMiddleware]
+      })
+      .finish();
+
+    let except;
+    promise
+      .then(data => {
+        except = data;
+      });
+    setTimeout(() => {
+      assert.equal(except, 60);
+      done();
+    }, 30);
+  });
+
 });
