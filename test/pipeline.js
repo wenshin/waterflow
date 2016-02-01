@@ -183,4 +183,49 @@ describe('pipeline', function () {
     }, 30);
   });
 
+  it('可以在同步方法中正确执行 breakPipeline', function () {
+    let except = pipeline(10)
+    // let except = pipeline(10, {middlewares: [PipelineLoggerMiddleware]})
+      .flow((v, breakPipeline) => {
+        breakPipeline();
+        return 2 * v;
+      })
+      .flowMap({handle: v => 1/v, filter: v => v < 30})
+      .flowReduce({
+        handle: (pre, cur) => pre + cur,
+        initialValue: 0,
+        middlewares: [RoundNumberPipeMiddleware]
+      })
+      .finish();
+    assert.equal(except, 20);
+  });
+
+  it('可以在异步方法中正确执行 breakPipeline', function (done) {
+    let async2Times = (data, breakPipeline) => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          breakPipeline();
+          resolve(data * 2);
+        }, 10);
+      });
+    };
+
+    let promise = pipeline(10)
+    // let promise = pipeline(10, {middlewares: [PipelineLoggerMiddleware]})
+      .flow(v => -v)
+      .flowAsync(async2Times)
+      .flowMap({handle: v => 1/v, filter: v => v < 30})
+      .flowReduce({
+        handle: (pre, cur) => pre + cur,
+        initialValue: 0,
+        middlewares: [RoundNumberPipeMiddleware]
+      })
+      .finish();
+
+    promise.then(data => {
+      assert.equal(data, -20);
+      done();
+    });
+  });
+
 });
