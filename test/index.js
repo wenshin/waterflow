@@ -1,5 +1,6 @@
 import {assert} from 'chai';
 import Pipeline from '../lib';
+import {pipeline as _pipeline} from '../lib';
 import PipelineLogger from '../lib/middlewares/logger';
 
 describe('Pipeline', function () {
