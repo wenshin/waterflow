@@ -2,7 +2,7 @@ var Pipeline = require('../../dist').default;
 var PipelineLogger = require('../../dist/middlewares/logger').default;
 var makeRoundNumberHandler = require('../../dist/middlewares/number').makeRoundNumberHandler;
 
-Pipeline.pipelineMiddlewares.push(PipelineLogger);
+Pipeline.setPipelineMiddlewares([PipelineLogger]);
 
 var RoundNumberPipeMiddleware = {
   type: 'pipe',

@@ -1,6 +1,7 @@
 import {assert} from 'chai';
 import Pipeline from '../lib';
-import {pipeline as _pipeline} from '../lib';
+// test reference pipeline
+import {pipeline as _pipeline} from '../lib'; // eslint-disable-line no-unused-vars
 import PipelineLogger from '../lib/middlewares/logger';
 
 describe('Pipeline', function () {
@@ -23,7 +24,7 @@ describe('Pipeline', function () {
       name: 'async',
       type: 'async',
       handle(v) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           setTimeout(() => resolve(v * 2), 10);
         });
       }
@@ -44,9 +45,9 @@ describe('Pipeline', function () {
         {name: 'Negative', handle: v => -v}
       ]
     );
-    Pipeline.pipelineMiddlewares.push(PipelineLogger);
+    Pipeline.setPipelineMiddlewares([PipelineLogger]);
     assert.equal(pipeline.flow(10), -10);
-    Pipeline.pipelineMiddlewares = [];
+    Pipeline.setPipelineMiddlewares();
   });
 
 });
