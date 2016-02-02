@@ -50,4 +50,17 @@ describe('Pipeline', function () {
     Pipeline.setPipelineMiddlewares();
   });
 
+  it('应该不运行 Logger 中间件，当设置 settings.logging 为 false', function () {
+    let pipeline = new Pipeline(
+      'Pipeline Logger test',
+      [
+        {name: 'pipe1', handle: v => v},
+        {name: 'Negative', handle: v => -v}
+      ]
+    );
+    Pipeline.setPipelineMiddlewares([PipelineLogger]);
+    assert.equal(pipeline.flow(10, {logging: false}), -10);
+    Pipeline.setPipelineMiddlewares();
+  });
+
 });
