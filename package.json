@@ -8,9 +8,7 @@
     "email": "wenshin2011@gmail.com",
     "url": "https://github.com/wenshin/waterflow"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist", "lib"],
   "main": "dist/index.js",
   "keywords": [],
   "repository": "wenshin/waterflow",
