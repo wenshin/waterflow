@@ -190,12 +190,7 @@ describe('pipeline', function () {
         breakPipeline();
         return 2 * v;
       })
-      .flowMap({handle: v => 1/v, filter: v => v < 30})
-      .flowReduce({
-        handle: (pre, cur) => pre + cur,
-        initialValue: 0,
-        middlewares: [RoundNumberPipeMiddleware]
-      })
+      .flow({handle: v => 1/v})
       .finish();
     assert.equal(except, 20);
   });
@@ -214,18 +209,44 @@ describe('pipeline', function () {
     // let promise = pipeline(10, {middlewares: [PipelineLoggerMiddleware]})
       .flow(v => -v)
       .flowAsync(async2Times)
-      .flowMap({handle: v => 1/v, filter: v => v < 30})
-      .flowReduce({
-        handle: (pre, cur) => pre + cur,
-        initialValue: 0,
-        middlewares: [RoundNumberPipeMiddleware]
-      })
+      .flow({handle: v => 1/v})
       .finish();
 
     promise.then(data => {
       assert.equal(data, -20);
       done();
     });
+  });
+
+  it('可以在同步方法 flowMap 中正确执行 breakPipeline', function () {
+
+    let except = pipeline([10, 20])
+    // let except = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
+      .flowMap((v, breakPipeline) => {
+        breakPipeline();
+        return -v;
+      })
+      .flowReduce({handle: (pre, cur) => pre + cur})
+      .finish();
+
+    assert.sameMembers(except, [-10, -20]);
+  });
+
+  it('可以在同步方法 flowReduce 中正确执行 breakPipeline', function () {
+
+    let except = pipeline([10, 20])
+    // let except = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
+      .flowReduce({
+        handle: (pre, cur, breakPipeline) => {
+          breakPipeline();
+          return pre + cur;
+        },
+        initialValue: 0
+      })
+      .flowMap(v => -v)
+      .finish();
+
+    assert.equal(except, 30);
   });
 
 });
