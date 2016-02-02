@@ -21,6 +21,29 @@ let ToNumberPipelineMiddleware = {
   pre: toNumberHandler
 };
 
+let asyncDelay = 5;
+let asyncPipeNegtive = v => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve(-v);
+    }, asyncDelay);
+  });
+};
+let asyncPipePlus1 = v => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve(++v);
+    }, asyncDelay);
+  });
+};
+let asyncPipeExtra = () => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve(30);
+    }, asyncDelay);
+  });
+};
+let mapFilter = v => v < 20;
 
 describe('pipeline', function () {
   it('应该正确运行非异步方法', function () {
@@ -140,50 +163,43 @@ describe('pipeline', function () {
     assert.deepEqual(except, {key1: -10, key3: 30});
   });
 
-  it('flowMapAsync 的传入数组数据元素个数与 handles 元素个数不一致时，应当取其中元素最多的个数遍历', function (done) {
-    let delay = 5;
-    // let promise = pipeline([10, 20])
-    let promise = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
+  it('flowMapAsync 的传入 Array 数据元素个数与 handles 元素个数不一致时，应当取其中元素最多的个数遍历', function (done) {
+    let promise = pipeline([10, 20])
+    // let promise = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
       .flowMapAsync({
         name: 'Map Async Test',
-        handles: [
-          v => {
-            return new Promise(resolve => {
-              setTimeout(() => {
-                resolve(-v);
-              }, delay);
-            });
-          },
-          v => {
-            return new Promise(resolve => {
-              setTimeout(() => {
-                resolve(++v);
-              }, delay);
-            });
-          },
-          () => {
-            return new Promise(resolve => {
-              setTimeout(() => {
-                resolve(30);
-              }, delay);
-            });
-          }
-        ],
-        filter: v => v < 20
+        handles: [asyncPipeNegtive, asyncPipePlus1, asyncPipeExtra],
+        filter: mapFilter
       })
       .flowReduce((p, c) => p + c)
       .finish();
 
     let except;
-    promise
-      .then(data => {
-        except = data;
-      });
+    promise.then(data => except = data);
 
     setTimeout(() => {
       assert.equal(except, 20);
       done();
-    }, delay * 3 + 5);
+    }, asyncDelay * 3 + 5);
+  });
+
+  it('flowMapAsync 的传入 Object 数据元素个数与 handles 元素个数不一致时，应当取其中元素最多的个数遍历', function (done) {
+    let promise = pipeline({key1: 10, key2: 20})
+    // let promise = pipeline({key1: 10, key2: 20}, {middlewares: [PipelineLoggerMiddleware]})
+      .flowMapAsync({
+        name: 'Map Async Test',
+        handles: {key1: asyncPipeNegtive, key2: asyncPipePlus1, key3: asyncPipeExtra},
+        filter: mapFilter
+      })
+      .finish();
+
+    let except;
+    promise.then(data => except = data);
+
+    setTimeout(() => {
+      assert.deepEqual(except, {key1: -10, key3: 30});
+      done();
+    }, asyncDelay * 3 + 5);
   });
 
   it('可以正确执行只有一个 handler 的 flowMapAsync', function (done) {
@@ -206,11 +222,7 @@ describe('pipeline', function () {
       .finish();
 
     let except;
-    promise
-      .then(data => {
-        except = data;
-      });
-
+    promise.then(data => except = data);
     setTimeout(() => {
       assert.equal(except, 60);
       done();
@@ -245,10 +257,7 @@ describe('pipeline', function () {
       .finish();
 
     let except;
-    promise
-      .then(data => {
-        except = data;
-      });
+    promise.then(data => except = data);
     setTimeout(() => {
       assert.equal(except, 55);
       done();
@@ -320,5 +329,4 @@ describe('pipeline', function () {
 
     assert.equal(except, 30);
   });
-
 });

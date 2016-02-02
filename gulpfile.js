@@ -44,16 +44,17 @@ gulp.task('test', ['pre-test'], function (cb) {
     .pipe(plumber())
     .pipe(mocha({reporter: 'spec'}))
     .on('error', function (err) {
+      err && console.log(err);
       mochaErr = err;
     })
     .pipe(istanbul.writeReports())
-    .on('end', function () {
+    .on('end', function (err) {
       // 'test failed'.indexOf('1 test failed') === -1 !!!
       let message = mochaErr ? mochaErr.message : '';
       if ( !/tests?\s+failed/gi.test(message) ) {
         cb(mochaErr);
       } else {
-        cb('');
+        cb(err);
       }
     });
 });
