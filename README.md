@@ -13,7 +13,7 @@ npm install waterflow --save
 
 #### Explain SyncPipe and AsyncPipe
 
-SyncPipe is a type of pipe will execute immediately. SyncPipe include `flow`, `flowMap`, `flowReduce`.
+SyncPipe is a type of pipe will execute immediately. SyncPipe includes `flow`, `flowMap` and `flowReduce`.
 
 AsyncPipe is a type of pipe will execute async.
 
@@ -62,7 +62,7 @@ pipeline
     .catch(err => console.log(err));
 ```
 
-### Flow data with SyncPipe `flowMap` and `flowReduce`
+### <a name="sync-pipe-map-reduce">Flow data with SyncPipe `flowMap` and `flowReduce`</a>
 
 ```javascript
 import Pipeline from 'waterflow';
@@ -82,7 +82,7 @@ assert.equal(pipeline.flow({data1: 10, data2: 20, data3: 30}), 10 + 1 + 20 + 1);
 
 ```
 
-### Flow data with AsyncPipe `flowMapAsync`
+### <a name="async-pipe">Flow data with AsyncPipe `flowMapAsync`</a>
 
 ```javascript
 import Pipeline from 'waterflow';
@@ -94,10 +94,10 @@ let pipeline = new Pipeline(
         // This example will drop the value which great or equal 30
         {
             name: 'map plus 1',
-            handle: v => v => {
+            handle: v => {
                 return new Promise((resolve, reject) => {
                     setTimeout(() => {
-                        resolve(v++);
+                        resolve(++v);
                     }, 200)
                 });
             },
@@ -119,9 +119,48 @@ pipeline
     });
 ```
 
-### Middlewares
+### <a name="break-pipeline">Break Pipeline in pipe</a>
 
-Javascript has a weird problem.
+> Warning: New feature in 0.1.2
+
+```
+let pipeline = new Pipeline(
+    'Pipeline Logger test',
+    [
+        {
+            name: 'plus 1',
+            handle: (v, breakPipeline) => {
+                breakPipeline();
+                return ++v;
+            }},
+        {
+            name: 'map plus 1',
+            handle: (v, breakPipeline) => {
+                breakPipeline();
+                return ++v;
+            },
+            filter: v => v < 30,
+            type: 'map'},
+        {
+            name: 'map plus 1',
+            handle: (v, breakPipeline) => {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        breakPipeline();
+                        resolve(++v);
+                    }, 200)
+                });
+            },
+            filter: v => v < 30,
+            type: 'mapAsync'}
+    ]
+);
+```
+
+### <a name="middleware">Middleware</a>
+
+Javascript has a weird problem `0.1 + 0.2 === 0.3000000000000002`, you must fix it everywhere.
+In Pipeline you can use middlewares to handle this, see [Customize Middlewares](#customize-middlewares).
 
 Pipeline can use middlewares between pipes, before first pipe start and after last pipe finished.
 
@@ -138,7 +177,7 @@ Pipeline can use middlewares between pipes, before first pipe start and after la
 (5): PipeMiddleware2.post
 (6): PipelineMiddleware1.post
 
-### Use and Customize Middlewares
+### <a name="customize-middlewares">Use and Customize Middlewares</a>
 
 ```javascript
 import Pipeline from 'waterflow';
