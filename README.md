@@ -28,6 +28,8 @@ If there is a AsyncPipe in pipeline, the `Pipeline.flow()` will return a promise
 ```javascript
 import Pipeline from 'waterflow';
 
+let settings = {logging: false};
+
 let pipeline = new Pipeline(
     'Pipeline of SyncPipe',
     [
@@ -36,7 +38,7 @@ let pipeline = new Pipeline(
     ]
 );
 
-assert.equal(pipeline.flow(10), -11);
+assert.equal(pipeline.flow(10, settings), -11);
 
 let pipeline = new Pipeline(
     'Pipeline of SyncPipe and AsyncPipe',
@@ -156,6 +158,26 @@ let pipeline = new Pipeline(
     ]
 );
 ```
+### <a name="settings">Settings</a>
+settings can be access in state, like the parameter of Middlewares。
+
+
+#### Set Settings
+
+```
+import {pipeline} from 'waterflow';
+import Pipeline from 'waterflow';
+
+let output = pipeline(10, {name: 'myPipeline', settings: {logging: false}})
+    .flow(v => -v)
+    .finish();
+
+let ppl = new Pipeline('myPipeline', [
+    {handle: v => -v}
+])
+
+ppl.flow(10, {logging: false});
+```
 
 ### <a name="middleware">Middleware</a>
 
@@ -207,4 +229,7 @@ let pipeline = new Pipeline(
         {name: '', handle: v => 1 / v, middlewares=[RoundNumberPipeMiddleware]},
     ]
 );
+
+let settings = {logging: false};
+pipeline.flow(10, settings);
 ```
