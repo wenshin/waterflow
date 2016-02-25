@@ -116,7 +116,7 @@ describe('pipeline.sync', function () {
 
     let except = pipeline([10, 20])
     // let except = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
-      .flowMap((v, breakPipeline) => {
+      .flowMap((v, i, breakPipeline) => {
         breakPipeline();
         return -v;
       })

@@ -170,6 +170,37 @@ describe('pipeline.async', function () {
     }, 30);
   });
 
+  it('可以正确执行有包含失败情况的多个 handler 的 flowMapAsync', function (done) {
+    let async2Times = data => {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve(data * 2);
+        }, 10);
+      });
+    };
+
+    let asyncHalf = () => {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          reject('half error');
+        }, 10);
+      });
+    };
+
+    let promise = pipeline([10, 20, 30])
+    // let promise = pipeline([10, 20, 30], {middlewares: [PipelineLoggerMiddleware]})
+      .flowMapAsync({handles: [async2Times, null, asyncHalf]})
+      .finish();
+
+    let except;
+    promise.then(() => {}, result => except = result);
+    setTimeout(() => {
+      assert.deepEqual(except.data, {0: 20, 1: 20});
+      assert.deepEqual(except.errors, {2: 'half error'});
+      done();
+    }, 30);
+  });
+
   it('可以正确执行只有一个 handler 的 flowMapAsync', function (done) {
     let asyncPipe = data => {
       return new Promise((resolve) => {
