@@ -112,7 +112,7 @@ describe('pipeline.async', function () {
     }, asyncDelay * 3 + 5);
   });
 
-  it('可以在异步方法中正确执行 breakPipeline', function (done) {
+  it('可以在 flowAsync 方法中正确执行 breakPipeline', function (done) {
     let async2Times = (data, breakPipeline) => {
       return new Promise((resolve) => {
         setTimeout(() => {
@@ -131,6 +131,28 @@ describe('pipeline.async', function () {
 
     promise.then(data => {
       assert.equal(data, -20);
+      done();
+    });
+  });
+
+  it('可以在 flowMapAsync 方法中正确执行 breakPipeline', function (done) {
+    let async2Times = (data, index, breakPipeline) => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          breakPipeline();
+          resolve(data * 2 + index);
+        }, 10);
+      });
+    };
+
+    let promise = pipeline([10, 20])
+    // let promise = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
+      .flowMapAsync(async2Times)
+      .flowMap(v => -v)
+      .finish();
+
+    promise.then(data => {
+      assert.sameMembers(data, [20, 41]);
       done();
     });
   });

@@ -118,12 +118,12 @@ describe('pipeline.sync', function () {
     // let except = pipeline([10, 20], {middlewares: [PipelineLoggerMiddleware]})
       .flowMap((v, i, breakPipeline) => {
         breakPipeline();
-        return -v;
+        return i - v;
       })
       .flowReduce({handle: (pre, cur) => pre + cur})
       .finish();
 
-    assert.sameMembers(except, [-10, -20]);
+    assert.sameMembers(except, [-10, -19]);
   });
 
   it('可以在同步方法 flowReduce 中正确执行 breakPipeline', function () {
