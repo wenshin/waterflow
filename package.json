@@ -1,6 +1,6 @@
 {
   "name": "waterflow",
-  "version": "0.1.6-alpha.3",
+  "version": "0.1.6-alpha.4",
   "description": "A pipeline deal with data like water. support Map, Reduce, Async Pipes and Middlewares.",
   "homepage": "https://github.com/wenshin/waterflow",
   "author": {
