@@ -94,8 +94,8 @@ describe('pipeline.async', function () {
   });
 
   it('flowMapAsync 的传入 Object 数据元素个数与 handles 元素个数不一致时，应当取其中元素最多的个数遍历', function (done) {
-    // let promise = pipeline({key1: 10, key2: 20})
-    let promise = pipeline({key1: 10, key2: 20}, {middlewares: [PipelineLoggerMiddleware]})
+    let promise = pipeline({key1: 10, key2: 20})
+    // let promise = pipeline({key1: 10, key2: 20}, {middlewares: [PipelineLoggerMiddleware]})
       .flowMapAsync({
         name: 'Map Async Test',
         handles: {key1: asyncPipeNegtive, key2: asyncPipePlus1, key3: asyncPipeExtra},
