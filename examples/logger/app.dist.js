@@ -6,9 +6,11 @@ Object.defineProperty(exports, "__esModule", {
 });
 exports.assertState = assertState;
 exports.assertPipeHandler = assertPipeHandler;
+exports.assertFlowReducePipe = assertFlowReducePipe;
 exports.assertMiddleware = assertMiddleware;
+exports.assertPromise = assertPromise;
 function assertState(state) {
-  if (!state.pipe || !state.value) {
+  if (!state.pipe) {
     throw new TypeError('Middleware handler should return a Object contain pipe and value properties');
   }
 }
@@ -19,9 +21,22 @@ function assertPipeHandler(pipe) {
   }
 }
 
+function assertFlowReducePipe(pipe) {
+  // initialValue is NaN
+  if (pipe.initialValue !== pipe.initialValue) {
+    throw new TypeError('the initialValue prop of [Pipe-' + pipe.type + '] can not be NaN!');
+  }
+}
+
 function assertMiddleware(middleware, type) {
   if (middleware[type] && !(middleware[type] instanceof Function)) {
     throw new TypeError('Middleware handler should be a function');
+  }
+}
+
+function assertPromise(name, promise) {
+  if (!(promise && promise.then instanceof Function && promise.catch instanceof Function)) {
+    throw new Error('\n      [pipeline.flowAsync][' + name + '] accept a `Function(pipeState)`\n      should return Promise instance!\n    ');
   }
 }
 
@@ -36,6 +51,7 @@ var _createClass = (function () { function defineProperties(target, props) { for
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports.pipeline = undefined;
 
 var _utils = require('./utils');
 
@@ -77,10 +93,10 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 
 var Pipeline = (function () {
   _createClass(Pipeline, null, [{
-    key: 'applyPipelineMiddlewares',
+    key: 'setPipelineMiddlewares',
 
     /**
-     * 追加 Pipeline 层次的中间件。
+     * 设置 Pipeline 层次的中间件。
      *
      * @param  {Array PipelineMiddleware|PipelineMiddleware}  middlewares
      *     PipelineMiddleware 对象，Pipeline 层次的中间件
@@ -107,14 +123,14 @@ var Pipeline = (function () {
      */
 
     // Pipeline 层的中间件
-    value: function applyPipelineMiddlewares() {
+    value: function setPipelineMiddlewares() {
       var middlewares = arguments.length <= 0 || arguments[0] === undefined ? [] : arguments[0];
 
-      Pipeline.pipelineMiddlewares = Pipeline.pipelineMiddlewares.concat(middlewares);
+      (0, _pipeline.setCommonPipelineMiddlewares)(middlewares);
     }
 
     /**
-     * 追加 Pipe 层次的中间件。
+     * 设置 Pipe 层次的中间件。
      *
      * @param  {Array PipeMiddleware|PipeMiddleware}  middlewares
      *     PipeMiddleware 对象，Pipeline 层次的中间件
@@ -134,11 +150,11 @@ var Pipeline = (function () {
     // Pipe 层通用中间件，pre 优先执行，post 倒序执行
 
   }, {
-    key: 'applyCommonPipeMiddlewares',
-    value: function applyCommonPipeMiddlewares() {
+    key: 'setPipeMiddlewares',
+    value: function setPipeMiddlewares() {
       var middlewares = arguments.length <= 0 || arguments[0] === undefined ? [] : arguments[0];
 
-      Pipeline.commonPipeMiddlewares = Pipeline.commonPipeMiddlewares.concat(middlewares);
+      (0, _pipeline.setCommonPipeMiddlewares)(middlewares);
     }
   }]);
 
@@ -184,9 +200,12 @@ var Pipeline = (function () {
   _createClass(Pipeline, [{
     key: 'flow',
     value: function flow(data) {
+      var settings = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+
       var pipelined = (0, _pipeline2.default)(data, {
         name: this._name,
-        middlewares: Pipeline.pipelineMiddlewares
+        middlewares: Pipeline.pipelineMiddlewares,
+        settings: settings
       });
       pipelined = this.reduce(function (_pipelined, pipe) {
         var _pipe$type = pipe.type;
@@ -195,9 +214,7 @@ var Pipeline = (function () {
         var middlewares = _pipe$middlewares === undefined ? [] : _pipe$middlewares;
 
         var pipelineMethod = 'flow' + _utils.strUtil.capitalize(type);
-        return _pipelined[pipelineMethod](_extends({}, pipe, {
-          middlewares: middlewares.concat(Pipeline.commonPipeMiddlewares)
-        }));
+        return _pipelined[pipelineMethod](_extends({}, pipe, { middlewares: middlewares }));
       }, pipelined);
       return pipelined.finish();
     }
@@ -210,6 +227,7 @@ Pipeline.inheritProps = ['push', 'pop', 'shift', 'unshift', 'concat', 'slice', '
 Pipeline.pipelineMiddlewares = [];
 Pipeline.commonPipeMiddlewares = [];
 exports.default = Pipeline;
+exports.pipeline = _pipeline2.default;
 },{"./pipeline":7,"./utils":8}],3:[function(require,module,exports){
 'use strict';
 
@@ -270,9 +288,13 @@ function runMiddlewares(inputState, handlerType, handle) {
 },{"./asserts":1}],4:[function(require,module,exports){
 'use strict';
 
+var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+var isBrowser = !!console.groupCollapsed; // eslint-disable-line no-console
+
 var PipeLoggerMiddleware = exports.PipeLoggerMiddleware = {
   type: 'pipe',
   name: 'PipeLoggerMiddleware',
@@ -286,22 +308,45 @@ var PipeLoggerMiddleware = exports.PipeLoggerMiddleware = {
   }
 };
 
-var isBrowser = !!console.groupCollapsed; // eslint-disable-line no-console;
+function logPipe(state) {
+  var isOutput = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
 
-var FONT_BOLD = 'font-weight: bold';
-var PIPELINE_COLOR = 'color: #E91E63';
-var PIPELINE_STYLE = PIPELINE_COLOR + ';' + FONT_BOLD;
+  if (!_isLogging(state.settings)) return;
+  if (state.break) logBreak(state, isOutput);
+
+  var logger = isOutput ? 'log' : 'info';
+  var type = isOutput ? 'out' : 'in ';
+  var handlerType = isOutput ? 'post' : 'pre';
+  var name = state.pipe.name || 'pipe' + state.pipe.order;
+  var logState = _logState(state);
+
+  logState.middlewareStack = state.middlewareStack.concat({
+    handlerType: handlerType, PipeLoggerMiddleware: PipeLoggerMiddleware,
+    inputState: state, outputState: state
+  });
+
+  var logValue = state.skip ? 'SKIPED' : state.value;
+  var args = [];
+
+  if (isBrowser) {
+    args = ['%c' + name + ' %c' + type, 'color: #26C6DA', 'color: #555', logValue];
+    _isVerbose(state.settings) && (args = args.concat(['| State:', logState]));
+  } else {
+    args = ['\n' + name + ' <<< ' + type + ' >>>\n ' + logValue];
+    _isVerbose(state.settings) && args.push(logState);
+  }
+
+  _log(state, isOutput, args, logger);
+}
 
 var PipelineLoggerMiddleware = {
   type: 'pipeline',
   name: 'PipelineLoggerMiddleware',
   pre: function pre(state) {
     logPipeline(state);
-    state.middlewareStack.length && _console('info')('PrePipeline', state);
     return state;
   },
   post: function post(state) {
-    state.middlewareStack.length && _console('info')('postPipeline', state);
     logPipeline(state, true);
     return state;
   },
@@ -309,23 +354,24 @@ var PipelineLoggerMiddleware = {
   pipeMiddleware: PipeLoggerMiddleware
 };
 
-function _console() {
-  var type = arguments.length <= 0 || arguments[0] === undefined ? 'log' : arguments[0];
-
-  if (!console) return;
-  return (console[type] || console.log).bind(console); // eslint-disable-line no-console
-}
-
 function logPipeline(state) {
   var isOutput = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
 
+  if (!_isLogging(state.settings)) return;
+
+  var hasMiddlewares = state.middlewareStack.length;
+  var logState = _logState(state);
+
   if (!isOutput) {
     if (isBrowser) {
-      _console('groupCollapsed')((state.name || 'Pipeline') + ' %cInput : ', 'color: #E91E63', state.value);
+      _log(state, isOutput, [(state.name || 'Pipeline') + ' %cInput : ', 'color: #E91E63', state.value], 'groupCollapsed');
     } else {
-      _console('group')((state.name || 'Pipeline') + ' <<<Input>>>  ', state.value);
+      _log(state, isOutput, [(state.name || 'Pipeline') + ' <<<Input>>>  ', state.value], 'group');
     }
+    hasMiddlewares && _console('info')('PrePipeline', logState);
   } else {
+    _consoleState(state);
+    hasMiddlewares && _console('info')('postPipeline', logState);
     if (isBrowser) {
       _console('groupEnd')();
       _console('log')('%c' + (state.name || 'Pipeline') + ' %cOutput: ', 'font-weight: bold', 'font-weight: bold;color: #E91E63', state.value);
@@ -335,28 +381,60 @@ function logPipeline(state) {
   }
 }
 
-function logPipe(state) {
-  var isOutput = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
-
-  var logger = isOutput ? 'log' : 'info';
-  var type = isOutput ? 'out' : 'in ';
-  var handlerType = isOutput ? 'post' : 'pre';
-  var name = state.pipe.name || 'pipe' + state.pipe.order;
-  var isAsync = name.includes('Async');
-  var logState = Object.assign({}, state);
-
-  logState.middlewareStack = state.middlewareStack.concat({
-    handlerType: handlerType, PipeLoggerMiddleware: PipeLoggerMiddleware,
-    inputState: state, outputState: state
-  });
-
-  name = isOutput && !isAsync ? name.replace(/./g, ' ') : name;
-  var logValue = logState.skip ? 'SKIPED' : logState.value;
+function logBreak(state, isOutput) {
   if (isBrowser) {
-    _console(logger)('%c' + name + ' %c' + type + ' %c' + logValue, 'color: #26C6DA', 'color: #555', 'color: #26A69A', logState);
+    _log(state, isOutput, ['%cPipeline Break!', 'color: #E91E63']);
   } else {
-    _console(logger)('\n' + name + ' <<< ' + type + ' >>>\n ' + logValue, logState);
+    _log(state, isOutput, ['<<<Pipeline Break>>>']);
   }
+}
+
+function _log(state, isOutput, args) {
+  var type = arguments.length <= 3 || arguments[3] === undefined ? 'log' : arguments[3];
+  var pipe = state.pipe;
+
+  var log = { order: _order(pipe.order, isOutput, pipe.mapIndex), type: type, args: args };
+  if (!state.consoleStack) {
+    state.consoleStack = [log];
+  } else {
+    state.consoleStack.push(log);
+  }
+}
+
+function _consoleState(state) {
+  state.consoleStack.sort(function (a, b) {
+    return a.order - b.order;
+  });
+  state.consoleStack.forEach(function (log) {
+    _console(log.type).apply(null, log.args);
+  });
+}
+
+function _console() {
+  var type = arguments.length <= 0 || arguments[0] === undefined ? 'log' : arguments[0];
+
+  if (!console) return;
+  return (console[type] || console.log).bind(console); // eslint-disable-line no-console
+}
+
+function _isLogging(settings) {
+  return settings.logging === false ? false : true;
+}
+
+function _isVerbose(settings) {
+  return settings.verbose;
+}
+
+function _logState(state) {
+  var s = _extends({}, state);
+  delete s.consoleStack;
+  return s;
+}
+
+function _order(pipeOrder, isOutput) {
+  var mapIndex = arguments.length <= 2 || arguments[2] === undefined ? 0 : arguments[2];
+
+  return parseFloat(pipeOrder + '.' + mapIndex + (isOutput ? 1 : 0));
 }
 
 exports.default = PipelineLoggerMiddleware;
@@ -406,6 +484,7 @@ exports.execSyncReducePipe = execSyncReducePipe;
 exports.execSyncPipe = execSyncPipe;
 exports.execAsyncPipe = execAsyncPipe;
 exports.resetPipeState = resetPipeState;
+exports.breakPipeline = breakPipeline;
 
 var _isPlainObject2 = require('lodash/lang/isPlainObject');
 
@@ -420,6 +499,14 @@ var _middleware = require('./middleware');
 var _asserts = require('./asserts');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var TYPES = {
+  SYNC: 'flow',
+  ASYNC: 'flowAsync',
+  MAP: 'flowMap',
+  MAP_ASYNC: 'flowMapAsync',
+  REDUCE: 'flowReduce'
+};
 
 function preparePipe(pipe, type) {
   var commonMiddlewares = arguments.length <= 2 || arguments[2] === undefined ? [] : arguments[2];
@@ -437,27 +524,27 @@ function preparePipe(pipe, type) {
 
   return _extends({}, pipe, {
     type: type,
-    name: name ? name : 'pipe-' + type,
+    name: name || 'pipe-' + type,
     middlewares: middlewares.concat(commonMiddlewares)
   });
 }
 
 function execAllSyncPipe(state) {
   switch (state.pipe.type) {
-    case 'flow':
+    case TYPES.SYNC:
       return execSyncPipe(state);
-    case 'flowMap':
+    case TYPES.MAP:
       return execSyncMapPipe(state);
-    case 'flowReduce':
+    case TYPES.REDUCE:
       return execSyncReducePipe(state);
   }
 }
 
 function execAllAsyncPipe(state) {
   switch (state.pipe.type) {
-    case 'flowAsync':
+    case TYPES.ASYNC:
       return execAsyncPipe(state);
-    case 'flowMapAsync':
+    case TYPES.MAP_ASYNC:
       return execAsyncMapPipe(state);
   }
 }
@@ -468,106 +555,240 @@ function execSyncMapPipe(state) {
 
 function execAsyncMapPipe(state) {
   var outputState = execMapPipe(state, true);
-  return Promise.all(outputState.value).then(function (states) {
-    return _extends({}, state, { value: states.map(function (s) {
-        return s.value;
-      }) });
+  return Object.assign(outputState, {
+    promise: promiseAll(outputState)
   });
 }
 
-function execMapPipe(state) {
+/**
+ * 处理 flowMap 的使用场景
+ * 1. [Function, ...] => [data, ...]
+ * 2. {a: Function, ...} => {a: data, ...}
+ */
+function execMapPipe(inputState) {
   var isAsync = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
-  var value = state.value;
-  var pipe = state.pipe;
+  var value = inputState.value;
+  var pipe = inputState.pipe;
 
+  var outputState = _extends({}, inputState);
   var isObject = (0, _isPlainObject3.default)(value);
-
-  var _utils$values = _utils2.default.values(value);
-
-  var pipeInput = _utils$values.list;
-  var keys = _utils$values.keys;
-
-  var output = isObject ? {} : [];
-
+  var outputValue = isObject ? {} : [];
   var filter = pipe.filter;
+
   if (!(filter && filter instanceof Function)) filter = function () {
     return true;
   };
 
-  pipeInput.map(function (item, index) {
-    var key = keys[index];
-    var cpPipe = _extends({}, pipe, { name: pipe.name + '-' + key });
-    var keep = filter(item, key);
+  // 对象和数组，都用 Object.keys() 的值来遍历
+
+  var _utils$toArray = _utils2.default.toArray(value);
+
+  var pipeInput = _utils$toArray.list;
+  var keys = _utils$toArray.keys;
+
+  var handleKeys = _utils2.default.keys(pipe.handles);
+  var iterKeys = keys.length < handleKeys.length ? handleKeys : keys;
+  var isSkip = false;
+
+  iterKeys.map(function (key, index) {
+    var item = pipeInput[index];
+    var cpPipe = _extends({}, pipe, { name: pipe.name + '-' + key, mapIndex: index });
+    // 当 pipeInput 的长度比pipe.handles 的长度小时，超出 pipeInput 长度的遍历不执行 filter。
+    var keep = pipeInput.length - 1 >= index ? filter(item, key) : true;
+    var pass = !keep;
+
     // 分别指定处理方法
     if (cpPipe.handles) {
       if (cpPipe.handles[key]) {
         cpPipe.handle = cpPipe.handles[key];
       } else {
-        keep = false;
+        pass = true;
       }
     }
-    // 不被接受的数据
-    if (!keep) {
-      cpPipe.name = cpPipe.name + '-dropped';
-      cpPipe.handle = isAsync ? _utils2.default.asyncPass : _utils2.default.pass;
+
+    // 需要过滤掉的数据的 `name` 增加 '-dropped' 后缀，打 log 时能够清晰看到
+    if (!keep) cpPipe.name = cpPipe.name + '-dropped';
+
+    // 当数据不保留时跳过，以及 handle 不存在时，什么也不做
+    if (pass) cpPipe.handle = isAsync ? _utils2.default.asyncPass : _utils2.default.pass;
+
+    var handle = cpPipe.handle;
+    cpPipe.handle = function (data) {
+      return handle(data, key, breakPipeline.bind(outputState));
+    };
+
+    var state = _extends({}, inputState, { pipe: cpPipe, value: item, skip: pass });
+    var _outputState = isAsync ? execAsyncPipe(state) : execSyncPipe(state);
+    var itemOutput = isAsync ? _outputState.promise : _outputState.value;
+
+    if (keep) {
+      isSkip = isSkip || _outputState.skip;
+      isObject ? outputValue[key] = itemOutput : outputValue.push(itemOutput);
     }
-
-    var itemOutput = isAsync ? execAsyncPipe(_extends({}, state, { pipe: cpPipe, value: item })) : execSyncPipe(_extends({}, state, { pipe: cpPipe, value: item })).value;
-
-    keep && (isObject ? output[key] = itemOutput : output.push(itemOutput));
   });
-  return _extends({}, state, { value: output });
+
+  return Object.assign(outputState, {
+    value: outputValue,
+    skip: isSkip
+  });
 }
 
 function execSyncReducePipe(state) {
   var pipe = state.pipe;
   var value = state.value;
 
-  var _utils$values2 = _utils2.default.values(value);
+  var _utils$toArray2 = _utils2.default.toArray(value);
 
-  var list = _utils$values2.list;
+  var list = _utils$toArray2.list;
+
+  var initialValue = pipe.initialValue === undefined ? null : pipe.initialValue;
+
+  (0, _asserts.assertFlowReducePipe)(pipe);
 
   state.value = list;
   state.pipe = _extends({}, pipe, {
-    handle: function handle(v) {
-      return v.reduce(pipe.handle, pipe.initialValue);
+    handle: function handle(v, breakReducePipeline) {
+      return v.reduce(function (pre, cur) {
+        return pipe.handle(pre, cur, breakReducePipeline);
+      }, initialValue);
     }
   });
   return execSyncPipe(state);
 }
 
 function execSyncPipe(state) {
-  state = resetPipeState(state);
+  var preState = undefined;
+  var outputState = undefined;
 
-  var preState = (0, _middleware.runMiddlewares)(state, 'pre');
-  var outputState = _extends({}, preState, { skip: false });
+  state = resetPipeState(state);
+  preState = (0, _middleware.runMiddlewares)(state, 'pre');
 
   (0, _asserts.assertPipeHandler)(preState.pipe);
 
-  if (!preState.skip) outputState.value = preState.pipe.handle(preState.value);
+  outputState = _extends({}, preState, { skip: false });
+  if (!preState.skip) {
+    outputState.value = preState.pipe.handle(preState.value, breakPipeline.bind(outputState));
+  }
   return (0, _middleware.runMiddlewares)(outputState, 'post');
 }
 
 function execAsyncPipe(inputState) {
   inputState = resetPipeState(inputState);
+
+  var promise = undefined;
   var name = inputState.pipe.name;
 
   var preState = (0, _middleware.runMiddlewares)(inputState, 'pre');
   var outputState = _extends({}, preState, { skip: false });
+
   if (preState.skip) preState.pipe.handle = _utils2.default.asyncPass;
+  promise = preState.pipe.handle(preState.value, breakPipeline.bind(outputState));
 
-  var promise = preState.pipe.handle(preState.value);
-  if (!(promise && promise.then instanceof Function && promise.catch instanceof Function)) {
-    throw new Error('\n      [pipeline.flowAsync][' + name + '] accept a `Function(pipeState)`\n      should return Promise instance!\n    ');
-  }
+  (0, _asserts.assertPromise)(name, promise);
 
-  return promise.then(function (data) {
-    return (0, _middleware.runMiddlewares)(_extends({}, outputState, { value: data }), 'post');
+  return _extends({}, inputState, {
+    promise: new Promise(function (resolve, reject) {
+      promise.then(function (data) {
+        return resolve((0, _middleware.runMiddlewares)(_extends({}, outputState, { value: data }), 'post'));
+      }, function (error) {
+        return reject((0, _middleware.runMiddlewares)(_extends({}, outputState, { value: error }), 'post'));
+      });
+    })
   });
 }
 
 function resetPipeState(state) {
   return _extends({}, state, { middlewareStack: [] });
+}
+
+function breakPipeline() {
+  this.break = true;
+}
+
+/**
+ * 多个 Promise 合并为一个 Promise 实例。
+ * @param  {Object}  state
+ *     当前 Pipeline 状态
+ * @param  {Boolean}   breakImmediately
+ *     true: 使用 ES6 Promise.all 模式。 该模式下， 一旦有一个 promise 执行失败了，
+ *           那么将不再等待其它 Promise 实例返回结果。
+ *     false: 默认，不适用 ES6 Promise.all
+ * @return {Promise}
+ */
+function promiseAll(state) {
+  var breakImmediately = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
+
+  // @var  {Iterator|Object}  promises
+  // Promise 实例的数组或者 Iterator，当 breakImmediately: false 时，还支持对象格式
+  var promises = state.value;
+  var isSkip = false;
+  // TODO，使用 Promise.all，promises
+  if (breakImmediately) return Promise.all(promises);
+
+  return new Promise(function (resolve, reject) {
+    var keys = _utils2.default.keys(promises);
+    var finishCount = 0;
+    var sum = keys.length;
+    var result = {
+      errors: {},
+      data: {}
+    };
+
+    var newState = function newState(value) {
+      return _extends({}, state, { skip: isSkip, value: value });
+    };
+
+    var always = function always(s) {
+      isSkip = isSkip || s.skip;
+
+      if (++finishCount < sum) return;
+
+      if (Object.keys(result.errors).length) {
+        reject(newState(result));
+      } else {
+        resolve(newState(Array.isArray(promises) ? _utils2.default.toArray(result.data).list : result.data));
+      }
+    };
+
+    var succWrap = function succWrap(key) {
+      return function (s) {
+        result.data[key] = s.value;
+        always(s);
+      };
+    };
+
+    var failWrap = function failWrap(key) {
+      return function (s) {
+        result.errors[key] = s.value;
+        always(s);
+      };
+    };
+
+    var _iteratorNormalCompletion = true;
+    var _didIteratorError = false;
+    var _iteratorError = undefined;
+
+    try {
+      for (var _iterator = keys[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+        var key = _step.value;
+
+        promises[key].then(succWrap(key), failWrap(key));
+      }
+    } catch (err) {
+      _didIteratorError = true;
+      _iteratorError = err;
+    } finally {
+      try {
+        if (!_iteratorNormalCompletion && _iterator.return) {
+          _iterator.return();
+        }
+      } finally {
+        if (_didIteratorError) {
+          throw _iteratorError;
+        }
+      }
+    }
+  });
 }
 },{"./asserts":1,"./middleware":3,"./utils":8,"lodash/lang/isPlainObject":26}],7:[function(require,module,exports){
 'use strict';
@@ -578,6 +799,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.default = pipeline;
+exports.setCommonPipelineMiddlewares = setCommonPipelineMiddlewares;
+exports.setCommonPipeMiddlewares = setCommonPipeMiddlewares;
 
 var _utils = require('./utils');
 
@@ -589,13 +812,16 @@ var _pipe = require('./pipe');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var commonPipeMiddlewares = [];
+var commonPipelineMiddlewares = [];
+
 /**
  * 生成一个处理数据的 Pipeline 包装
  *
  * @param  {AnyType} value               待处理的值
  *
  * @param  {String}  config.name         名称
- * @param  {Boolean} config.verbose      是否打印日志
+ * @param  {Boolean} config.logging      是否打印日志
  * @param  {Array}   config.middlewares  中间件
  *
  * @return {Object}
@@ -612,15 +838,27 @@ function pipeline(_input) {
 
   var _pipelineMiddlewares = _ref$middlewares === undefined ? [] : _ref$middlewares;
 
+  var _ref$settings = _ref.settings;
+
+  var _settings = _ref$settings === undefined ? {} : _ref$settings;
+
+  _pipelineMiddlewares = [].concat(_pipelineMiddlewares, commonPipelineMiddlewares);
+
   var _inputState = {
     name: _pipelineName,
     value: _input,
-    pipe: { handle: _utils2.default.pass, middlewares: _pipelineMiddlewares },
+    pipe: {
+      order: 0,
+      handle: _utils2.default.pass,
+      middlewares: _pipelineMiddlewares
+    },
     skip: false,
+    break: false,
+    settings: _settings,
     middlewareStack: []
   };
 
-  var _commonPipeMiddlewares = [];
+  var _commonPipeMiddlewares = [].concat(commonPipeMiddlewares);
   var _outputState = (0, _middleware.runMiddlewares)(_inputState, 'pre', function (middleware) {
     middleware.pipeMiddleware && _commonPipeMiddlewares.push(middleware.pipeMiddleware);
   });
@@ -647,13 +885,11 @@ function pipeline(_input) {
      */
 
     flow: function flow(pipe) {
-      pipe = _preparePipe(pipe, 'flow');
-      _addSyncPipe(pipe);
+      _addPipe(pipe, 'flow');
       return pipelineInstance;
     },
     flowAsync: function flowAsync(pipe) {
-      pipe = _preparePipe(pipe, 'flowAsync');
-      _addAsyncPipe(pipe);
+      _addPipe(pipe, 'flowAsync');
       return pipelineInstance;
     },
 
@@ -666,13 +902,11 @@ function pipeline(_input) {
      * @return {Object}         pipelineInstance
      */
     flowMap: function flowMap(pipe) {
-      pipe = _preparePipe(pipe, 'flowMap');
-      _addSyncPipe(pipe);
+      _addPipe(pipe, 'flowMap');
       return pipelineInstance;
     },
     flowMapAsync: function flowMapAsync(pipe) {
-      pipe = _preparePipe(pipe, 'flowMapAsync');
-      _addAsyncPipe(pipe);
+      _addPipe(pipe, 'flowMapAsync');
       return pipelineInstance;
     },
 
@@ -685,8 +919,7 @@ function pipeline(_input) {
      * @return {Object}         pipelineInstance
      */
     flowReduce: function flowReduce(pipe) {
-      pipe = _preparePipe(pipe, 'flowReduce');
-      _addSyncPipe(pipe);
+      _addPipe(pipe, 'flowReduce');
       return pipelineInstance;
     },
     finish: function finish() {
@@ -711,6 +944,17 @@ function pipeline(_input) {
     }
   };
 
+  function _addPipe(pipe, type) {
+    if (_outputState.break) return;
+
+    pipe = _preparePipe(pipe, type);
+    if (type.includes('Async')) {
+      _addAsyncPipe(pipe);
+    } else {
+      _addSyncPipe(pipe);
+    }
+  }
+
   function _preparePipe(pipe, type) {
     var newPipe = (0, _pipe.preparePipe)(pipe, type, _commonPipeMiddlewares);
     var order = ++_pipeCount;
@@ -724,7 +968,7 @@ function pipeline(_input) {
       var lastAsyncPipe = _asyncPipeQueue.slice(-1)[0];
       lastAsyncPipe && _syncPipesAfterAsync.get(lastAsyncPipe).push(pipe);
     } else {
-      _outputState = (0, _pipe.execAllSyncPipe)(_extends({}, _outputState, { pipe: pipe }));
+      _outputState = _execSyncPipe(_extends({}, _outputState, { pipe: pipe }));
     }
   }
 
@@ -734,20 +978,34 @@ function pipeline(_input) {
     _blocking || _execAsyncPipe(_extends({}, _outputState));
   }
 
+  function _execSyncPipe(inputState) {
+    return inputState.break ? inputState : (0, _pipe.execAllSyncPipe)(inputState);
+  }
+
   function _execAsyncPipe(inputState) {
+    if (inputState.break) return _handleSuccFinish(inputState);
+
     _blocking = true;
     inputState.pipe = _asyncPipeQueue[0];
 
-    (0, _pipe.execAllAsyncPipe)(inputState).then(function (state) {
-      return _asyncNext(state);
-    }).catch(function (err) {
-      _handleErrFinish(err);
+    (0, _pipe.execAllAsyncPipe)(inputState).promise.then(function (state) {
+      if (state.break) {
+        return _handleSuccFinish(state);
+      } else {
+        return _asyncNext(state);
+      }
+    }).catch(function (state) {
+      // 出错将终止后面排队的 pipe 进程
+      _handleErrFinish(state.value);
     }).then(function () {
       return _blocking = false;
     });
   }
 
   function _asyncNext(state) {
+    // 中间件设置 break 或者调用 breakPipeline 设置全局 break。
+    if (state.break) _handleSuccFinish(state);
+
     var _state = state;
     var asyncPipe = _state.pipe;
     var _iteratorNormalCompletion = true;
@@ -759,7 +1017,7 @@ function pipeline(_input) {
       for (var _iterator = _syncPipesAfterAsync.get(asyncPipe)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
         var syncPipe = _step.value;
 
-        state = (0, _pipe.execAllSyncPipe)(_extends({}, state, { pipe: syncPipe }));
+        state = _execSyncPipe(_extends({}, state, { pipe: syncPipe }));
       }
 
       // 把异步管道退出队列
@@ -791,6 +1049,14 @@ function pipeline(_input) {
 
   return pipelineInstance;
 }
+
+function setCommonPipelineMiddlewares(middlewares) {
+  commonPipelineMiddlewares = middlewares;
+}
+
+function setCommonPipeMiddlewares(middlewares) {
+  commonPipeMiddlewares = middlewares;
+}
 },{"./middleware":3,"./pipe":6,"./utils":8}],8:[function(require,module,exports){
 'use strict';
 
@@ -811,7 +1077,11 @@ var strUtil = exports.strUtil = {
   }
 };
 
-exports.default = {
+var utils = {
+  uid: function uid() {
+    return Date.now() + Math.random().toString().slice(2);
+  },
+
   pass: function pass(v) {
     return v;
   },
@@ -821,32 +1091,43 @@ exports.default = {
   },
 
   noop: function noop() {},
-  values: function values(data) {
-    var list = undefined;
-    var keys = [];
-
+  keys: function keys(data) {
     if (Array.isArray(data)) {
-      keys = data.map(function (item, index) {
+      return data.map(function (item, index) {
         return index;
       });
+    } else if ((0, _isPlainObject3.default)(data)) {
+      return Object.keys(data);
+    } else {
+      return [0];
+    }
+  },
+  toArray: function toArray(data) {
+    var list = undefined;
+    var keys = utils.keys(data);
+
+    if (Array.isArray(data)) {
       list = [].concat(data);
     } else if ((0, _isPlainObject3.default)(data)) {
-      keys = Object.keys(data);
       list = keys.map(function (key) {
         return data[key];
       });
+    } else {
+      list = [data];
     }
     return { list: list, keys: keys };
   },
 
   strUtil: strUtil
 };
+
+exports.default = utils;
 },{"lodash/lang/isPlainObject":26}],9:[function(require,module,exports){
 var Pipeline = require('../../dist').default;
 var PipelineLogger = require('../../dist/middlewares/logger').default;
 var makeRoundNumberHandler = require('../../dist/middlewares/number').makeRoundNumberHandler;
 
-Pipeline.pipelineMiddlewares.push(PipelineLogger);
+Pipeline.setPipelineMiddlewares([PipelineLogger]);
 
 var RoundNumberPipeMiddleware = {
   type: 'pipe',
@@ -861,7 +1142,7 @@ var pl = new Pipeline('myPipeline', [
     type: 'async',
     handle: v => {
       return new Promise((resolve, reject) => {
-        setTimeout(() => resolve(v * 2));
+        setTimeout(() => resolve(v * 2), 50);
       });
     }
   },

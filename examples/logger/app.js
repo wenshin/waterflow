@@ -17,7 +17,7 @@ var pl = new Pipeline('myPipeline', [
     type: 'async',
     handle: v => {
       return new Promise((resolve, reject) => {
-        setTimeout(() => resolve(v * 2));
+        setTimeout(() => resolve(v * 2), 50);
       });
     }
   },
