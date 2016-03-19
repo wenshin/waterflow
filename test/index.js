@@ -37,17 +37,30 @@ describe('Pipeline', function () {
       });
   });
 
-  it('应该正确运行 Logger 中间件', function () {
+  it('应该正确运行 Logger 中间件', function (done) {
     let pipeline = new Pipeline(
       'Pipeline Logger test',
       [
         {name: 'pipe1', handle: v => v},
+        {
+          name: 'asyncTimes',
+          handle: v => {
+            return new Promise((resolve, reject) => {
+              setTimeout(() => resolve(++v), 20);
+            });
+          },
+          type: 'async'
+        },
         {name: 'Negative', handle: v => -v}
       ]
     );
     Pipeline.setPipelineMiddlewares([PipelineLogger]);
-    assert.equal(pipeline.flow(10), -10);
-    Pipeline.setPipelineMiddlewares();
+    pipeline.flow(10)
+      .then(data => {
+        assert.equal(data, -11);
+        Pipeline.setPipelineMiddlewares();
+        done();
+      });
   });
 
   it('应该不运行 Logger 中间件，当设置 settings.logging 为 false', function () {
