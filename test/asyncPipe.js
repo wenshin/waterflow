@@ -204,21 +204,27 @@ describe('pipeline.async', function () {
     let asyncHalf = () => {
       return new Promise((resolve, reject) => {
         setTimeout(() => {
-          reject('half error');
+          reject({
+            data: {3: 1},
+            errors: {
+              2: {data: {a: 1}, errors: {21: ['21 error'], 22: '22 error'}},
+              4: 'half error'
+            }
+          });
         }, 10);
       });
     };
 
-    let promise = pipeline([10, 20, 30])
-    // let promise = pipeline([10, 20, 30], {middlewares: [PipelineLoggerMiddleware]})
+    // let promise = pipeline([10, 20, 30])
+    let promise = pipeline([10, 20, 30], {middlewares: [PipelineLoggerMiddleware]})
       .flowMapAsync({handles: [async2Times, null, asyncHalf]})
       .finish();
 
     let except;
-    promise.then(() => {}, result => except = result);
+    promise.then(() => {}, mixError => except = mixError);
     setTimeout(() => {
-      assert.deepEqual(except.data, {0: 20, 1: 20});
-      assert.deepEqual(except.errors, {2: 'half error'});
+      assert.deepEqual(except.data, { 0: 20, 1: 20, 2: {3: 1, 2: {a: 1}} });
+      assert.deepEqual(except.errors, {2: ['21 error', '22 error', 'half error']});
       done();
     }, 30);
   });
